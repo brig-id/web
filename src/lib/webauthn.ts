@@ -61,7 +61,7 @@ async function apiRequest<T>(
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
     try {
-      const data = (await response.json()) as { error?: string };
+      const data = JSON.parse(await response.text()) as { error?: string };
       if (data.error) message = data.error;
     } catch {
       // ignore — keep the generic message
@@ -69,8 +69,9 @@ async function apiRequest<T>(
     throw new WebAuthnError("api", message);
   }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const text = await response.text();
+  if (text.length === 0) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 export async function register(username: string): Promise<void> {

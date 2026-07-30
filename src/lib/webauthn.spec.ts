@@ -34,6 +34,16 @@ function fakeCredential(kind: "attestation" | "assertion") {
   };
 }
 
+/** Mirrors a real `fetch` Response: only `.text()` is used by `apiRequest`. */
+function jsonResponse(status: number, body: unknown) {
+  return { ok: status < 400, status, text: async () => JSON.stringify(body) };
+}
+
+/** Mirrors `axum`'s `Ok(StatusCode::OK)` handlers: 200 with an empty body. */
+function emptyOkResponse() {
+  return { ok: true, status: 200, text: async () => "" };
+}
+
 describe("register/login", () => {
   const memory = new Map<string, string>();
 
@@ -53,15 +63,23 @@ describe("register/login", () => {
   it("register() posts begin then finish with the session credential", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
           session_id: "sess-1",
-          challenge: { publicKey: { challenge: "Y2hhbGxlbmdl", user: { id: "dXNlcg", name: "u", displayName: "u" }, rp: { name: "brig-id" }, pubKeyCredParams: [] } },
+          challenge: {
+            publicKey: {
+              challenge: "Y2hhbGxlbmdl",
+              user: { id: "dXNlcg", name: "u", displayName: "u" },
+              rp: { name: "brig-id" },
+              pubKeyCredParams: [],
+            },
+          },
         }),
-      })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({}) });
+      )
+      // register/finish returns 200 with an empty body (no JSON) — this is
+      // the shape that previously crashed apiRequest with an uncaught
+      // SyntaxError instead of a WebAuthnError.
+      .mockResolvedValueOnce(emptyOkResponse());
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("navigator", {
       credentials: { create: vi.fn().mockResolvedValue(fakeCredential("attestation")) },
@@ -80,14 +98,19 @@ describe("register/login", () => {
   it("register() throws a browser WebAuthnError when the passkey ceremony is cancelled", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      vi.fn().mockResolvedValueOnce(
+        jsonResponse(200, {
           session_id: "sess-1",
-          challenge: { publicKey: { challenge: "Y2hhbGxlbmdl", user: { id: "dXNlcg", name: "u", displayName: "u" }, rp: { name: "brig-id" }, pubKeyCredParams: [] } },
+          challenge: {
+            publicKey: {
+              challenge: "Y2hhbGxlbmdl",
+              user: { id: "dXNlcg", name: "u", displayName: "u" },
+              rp: { name: "brig-id" },
+              pubKeyCredParams: [],
+            },
+          },
         }),
-      }),
+      ),
     );
     vi.stubGlobal("navigator", {
       credentials: { create: vi.fn().mockRejectedValue(new Error("NotAllowedError")) },
@@ -109,11 +132,7 @@ describe("register/login", () => {
   it("register() throws an api WebAuthnError on a non-2xx response", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValueOnce({
-        ok: false,
-        status: 409,
-        json: async () => ({ error: "username taken" }),
-      }),
+      vi.fn().mockResolvedValueOnce(jsonResponse(409, { error: "username taken" })),
     );
 
     const error = await register("alice@example.com").catch((err) => err);
@@ -125,19 +144,15 @@ describe("register/login", () => {
   it("login() returns the LoginResponse from the finish call", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
           session_id: "sess-2",
           challenge: { publicKey: { challenge: "Y2hhbGxlbmdl" } },
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ id_token: "jwt-token", user_id: "user-1" }),
-      });
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, { id_token: "jwt-token", user_id: "user-1" }),
+      );
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("navigator", {
       credentials: { get: vi.fn().mockResolvedValue(fakeCredential("assertion")) },

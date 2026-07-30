@@ -36,7 +36,7 @@ export default component$(() => {
         } else if (err.kind === "browser") {
           error.value = "Passkey sign-in was cancelled.";
         } else {
-          error.value = "Unknown user or sign-in failed.";
+          error.value = err.message;
         }
       } else {
         error.value = "Unexpected error.";
