@@ -33,7 +33,7 @@ export default component$(() => {
         } else if (err.kind === "network") {
           error.value = "Server unreachable. Please try again.";
         } else {
-          error.value = "Username already taken.";
+          error.value = err.message;
         }
       } else {
         error.value = "Unexpected error.";
