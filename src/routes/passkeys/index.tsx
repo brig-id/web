@@ -3,6 +3,8 @@ import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
 import { PasskeyItem } from "~/components/passkey-item/passkey-item";
 import { wa, useWaClick, useWaTextInput, type WaInputElement } from "~/lib/wa";
 import type { PasskeySummary } from "~/lib/api-types";
+import { isValidUsername } from "~/lib/validation";
+import { currentServer } from "~/lib/server";
 import {
   clearAuth,
   deletePasskey,
@@ -23,8 +25,10 @@ export default component$(() => {
   const signOutRef = useSignal<HTMLElement>();
   const addUsernameRef = useSignal<WaInputElement>();
   const addButtonRef = useSignal<HTMLElement>();
+  const server = useSignal("");
 
   useVisibleTask$(() => {
+    server.value = currentServer();
     void Promise.all([
       wa.card(),
       wa.input(),
@@ -70,10 +74,10 @@ export default component$(() => {
   });
 
   const handleAdd = $(async () => {
-    if (!addUsername.value) return;
+    if (!isValidUsername(addUsername.value)) return;
     adding.value = true;
     try {
-      await register(addUsername.value);
+      await register(`${addUsername.value}@${server.value}`);
       message.value = { kind: "success", text: "Passkey added." };
       addUsername.value = "";
       await refresh();
@@ -146,7 +150,7 @@ export default component$(() => {
             ref={addUsernameRef}
             label="Add a passkey"
             name="add-username"
-            placeholder="user@server"
+            placeholder="username"
             value={addUsername.value}
           />
           <wa-button ref={addButtonRef} variant="brand" loading={adding.value}>
