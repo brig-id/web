@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidHandle } from "./validation";
+import { isValidHandle, parseLoginInput } from "./validation";
 
 describe("isValidHandle", () => {
   it("accepts a well-formed handle", () => {
@@ -32,5 +32,49 @@ describe("isValidHandle", () => {
 
   it("rejects an empty server", () => {
     expect(isValidHandle("alice@")).toBe(false);
+  });
+});
+
+describe("parseLoginInput", () => {
+  it("treats a bare username as local to the current server", () => {
+    expect(parseLoginInput("alice", "example.com")).toEqual({
+      kind: "local",
+      username: "alice",
+      server: "example.com",
+    });
+  });
+
+  it("treats a handle matching the current server as local", () => {
+    expect(parseLoginInput("alice@example.com", "example.com")).toEqual({
+      kind: "local",
+      username: "alice",
+      server: "example.com",
+    });
+  });
+
+  it("compares the server case-insensitively", () => {
+    expect(parseLoginInput("alice@Example.com", "example.com")).toEqual({
+      kind: "local",
+      username: "alice",
+      server: "Example.com",
+    });
+  });
+
+  it("treats a handle for a different server as remote", () => {
+    expect(parseLoginInput("alice@other.example", "example.com")).toEqual({
+      kind: "remote",
+      username: "alice",
+      server: "other.example",
+    });
+  });
+
+  it("rejects an invalid bare username", () => {
+    expect(parseLoginInput("ab", "example.com")).toEqual({ kind: "invalid" });
+  });
+
+  it("rejects a malformed handle", () => {
+    expect(parseLoginInput("alice@ex@ample.com", "example.com")).toEqual({
+      kind: "invalid",
+    });
   });
 });
