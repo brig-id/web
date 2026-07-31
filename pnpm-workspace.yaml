@@ -3,3 +3,5 @@ allowBuilds:
   esbuild: true
   sharp: true
   "@tailwindcss/oxide": true
+minimumReleaseAgeExclude:
+  - "@web.awesome.me/webawesome-pro@3.11.0"

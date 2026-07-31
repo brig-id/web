@@ -44,5 +44,8 @@
     "vite": "7.3.6",
     "vite-tsconfig-paths": "4.3.2",
     "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "@web.awesome.me/webawesome-pro": "3.11.0"
   }
 }
