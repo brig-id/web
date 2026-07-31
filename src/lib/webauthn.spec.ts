@@ -44,6 +44,9 @@ function emptyOkResponse() {
   return { ok: true, status: 200, text: async () => "" };
 }
 
+type FakeResponse = ReturnType<typeof jsonResponse> | ReturnType<typeof emptyOkResponse>;
+type FakeFetch = (url: string, init?: RequestInit) => Promise<FakeResponse>;
+
 describe("register/login", () => {
   const memory = new Map<string, string>();
 
@@ -62,7 +65,7 @@ describe("register/login", () => {
 
   it("register() posts begin then finish with the session credential", async () => {
     const fetchMock = vi
-      .fn()
+      .fn<FakeFetch>()
       .mockResolvedValueOnce(
         jsonResponse(200, {
           session_id: "sess-1",
@@ -82,7 +85,11 @@ describe("register/login", () => {
       .mockResolvedValueOnce(emptyOkResponse());
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("navigator", {
-      credentials: { create: vi.fn().mockResolvedValue(fakeCredential("attestation")) },
+      credentials: {
+        create: vi
+          .fn<() => Promise<ReturnType<typeof fakeCredential>>>()
+          .mockResolvedValue(fakeCredential("attestation")),
+      },
     });
 
     await register("alice@example.com");
@@ -90,7 +97,7 @@ describe("register/login", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/auth/register/begin");
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/auth/register/finish");
-    const finishBody = JSON.parse(fetchMock.mock.calls[1]![1].body);
+    const finishBody = JSON.parse(fetchMock.mock.calls[1]![1]!.body as string);
     expect(finishBody.session_id).toBe("sess-1");
     expect(finishBody.credential.id).toBe("credential-id");
   });
@@ -113,7 +120,11 @@ describe("register/login", () => {
       ),
     );
     vi.stubGlobal("navigator", {
-      credentials: { create: vi.fn().mockRejectedValue(new Error("NotAllowedError")) },
+      credentials: {
+        create: vi
+          .fn<() => Promise<ReturnType<typeof fakeCredential>>>()
+          .mockRejectedValue(new Error("NotAllowedError")),
+      },
     });
 
     const error = await register("alice@example.com").catch((err) => err);
@@ -143,7 +154,7 @@ describe("register/login", () => {
 
   it("login() returns the LoginResponse from the finish call", async () => {
     const fetchMock = vi
-      .fn()
+      .fn<FakeFetch>()
       .mockResolvedValueOnce(
         jsonResponse(200, {
           session_id: "sess-2",
@@ -155,18 +166,24 @@ describe("register/login", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("navigator", {
-      credentials: { get: vi.fn().mockResolvedValue(fakeCredential("assertion")) },
+      credentials: {
+        get: vi
+          .fn<() => Promise<ReturnType<typeof fakeCredential>>>()
+          .mockResolvedValue(fakeCredential("assertion")),
+      },
     });
 
     const result = await login("alice@example.com", "client-1");
 
     expect(result).toEqual({ id_token: "jwt-token", user_id: "user-1" });
-    const beginBody = JSON.parse(fetchMock.mock.calls[0]![1].body);
+    const beginBody = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string);
     expect(beginBody).toEqual({ username: "alice@example.com", client_id: "client-1" });
   });
 
   it("deletePasskey() sends a DELETE with the bearer token", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const fetchMock = vi
+      .fn<() => Promise<{ ok: boolean; status: number }>>()
+      .mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", fetchMock);
 
     await deletePasskey("pk-1", "user-1", "jwt-token");
