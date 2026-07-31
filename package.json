@@ -29,12 +29,10 @@
   "devDependencies": {
     "@builder.io/qwik": "1.20.0",
     "@builder.io/qwik-city": "1.20.0",
-    "@tailwindcss/vite": "4.1.18",
     "@types/node": "20.19.0",
     "ignore": "^7.0.6",
     "oxlint": "^1.76.0",
     "prettier": "3.6.2",
-    "tailwindcss": "4.1.18",
     "typescript": "7.0.2",
     "typescript-plugin-css-modules": "5.2.0",
     "undici": "8.9.0",
