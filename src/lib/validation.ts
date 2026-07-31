@@ -7,7 +7,7 @@
 const USERNAME_PATTERN = /^[A-Za-z0-9_-]{3,64}$/;
 const HOSTNAME_LABEL_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$/;
 
-function isValidUsername(username: string): boolean {
+export function isValidUsername(username: string): boolean {
   if (!USERNAME_PATTERN.test(username)) return false;
   return !/^_+$/.test(username);
 }

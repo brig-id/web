@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAuth,
   deletePasskey,
+  isPasskeySupported,
   loadToken,
   loadUserId,
   login,
@@ -195,6 +196,14 @@ describe("register/login", () => {
         headers: expect.objectContaining({ Authorization: "Bearer jwt-token" }),
       }),
     );
+  });
+
+  it("isPasskeySupported() reflects PublicKeyCredential availability", () => {
+    vi.stubGlobal("window", { PublicKeyCredential: {} });
+    expect(isPasskeySupported()).toBe(true);
+
+    vi.stubGlobal("window", {});
+    expect(isPasskeySupported()).toBe(false);
   });
 
   it("round-trips auth state through localStorage", () => {

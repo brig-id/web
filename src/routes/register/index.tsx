@@ -1,8 +1,9 @@
 import { $, component$, useSignal, useVisibleTask$ } from "@builder.io/qwik";
 import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
 import { wa, useWaTextInput, type WaInputElement } from "~/lib/wa";
-import { isValidHandle } from "~/lib/validation";
-import { register, WebAuthnError } from "~/lib/webauthn";
+import { isValidUsername } from "~/lib/validation";
+import { currentServer } from "~/lib/server";
+import { register, isPasskeySupported, WebAuthnError } from "~/lib/webauthn";
 
 export default component$(() => {
   const nav = useNavigate();
@@ -12,28 +13,36 @@ export default component$(() => {
   const error = useSignal<string | null>(null);
   const formatError = useSignal<string | null>(null);
   const usernameRef = useSignal<WaInputElement>();
+  const supported = useSignal(true);
+  const server = useSignal("");
 
   useVisibleTask$(() => {
-    void Promise.all([
-      wa.card(),
-      wa.input(),
-      wa.button(),
-      wa.callout(),
-      wa.icon(),
-    ]);
+    server.value = currentServer();
+    supported.value = isPasskeySupported();
+    if (supported.value) {
+      void Promise.all([
+        wa.card(),
+        wa.input(),
+        wa.button(),
+        wa.callout(),
+        wa.icon(),
+      ]);
+    } else {
+      void Promise.all([wa.callout(), wa.icon()]);
+    }
   });
   useWaTextInput(usernameRef, username, touched);
 
   const handleSubmit = $(async () => {
-    if (!isValidHandle(username.value)) {
-      formatError.value = "Expected format: user@server";
+    if (!isValidUsername(username.value)) {
+      formatError.value = "3-64 letters, digits, - or _";
       return;
     }
     formatError.value = null;
     error.value = null;
     loading.value = true;
     try {
-      await register(username.value);
+      await register(`${username.value}@${server.value}`);
       await nav("/login/");
     } catch (err) {
       if (err instanceof WebAuthnError) {
@@ -56,6 +65,16 @@ export default component$(() => {
     ? (formatError.value ?? undefined)
     : undefined;
 
+  if (!supported.value) {
+    return (
+      <wa-callout variant="warning" class="auth-unsupported" role="alert">
+        <wa-icon slot="icon" name="triangle-exclamation"></wa-icon>
+        Passkeys aren't supported on this browser or device. Try a recent
+        version of Chrome, Safari, Edge, or Firefox.
+      </wa-callout>
+    );
+  }
+
   return (
     <wa-card class="auth-card">
       <form class="wa-stack" preventdefault:submit onSubmit$={handleSubmit}>
@@ -64,11 +83,16 @@ export default component$(() => {
           ref={usernameRef}
           label="Username"
           name="username"
-          placeholder="user@server"
+          placeholder="username"
           value={username.value}
           hint={usernameError}
           class={usernameError ? "wa-input-error" : undefined}
         />
+        {server.value && (
+          <p class="auth-server-hint">
+            on <strong>{server.value}</strong>
+          </p>
+        )}
         {error.value && (
           <wa-callout variant="danger" role="alert">
             <wa-icon slot="icon" name="circle-exclamation"></wa-icon>
