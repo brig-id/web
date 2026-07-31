@@ -48,12 +48,29 @@ export default defineConfig(({ command, mode }) => {
 
     server: {
       host: "0.0.0.0",
+      // *.localhost auto-resolves to 127.0.0.1 in every modern browser (no
+      // /etc/hosts entry needed) and is a secure context per the Secure
+      // Contexts spec, same as bare "localhost" — WebAuthn works on it over
+      // plain HTTP. Vite's Host-header check (DNS-rebinding protection)
+      // blocks anything not explicitly allowed, hence the entry below.
+      // Dropping the port too (bare "brigid.localhost", no ":5173") was
+      // evaluated and deferred: it needs Vite listening on :80 inside the
+      // container, which the non-root devcontainer user can't bind without
+      // added capabilities — more risk than the cosmetic win is worth today.
+      allowedHosts: [".localhost"],
       headers: {
         // Don't cache the server response in dev mode
         "Cache-Control": "public, max-age=0",
       },
+      // Both prefixes mirror server-leaf's real routes as-is (no synthetic
+      // "/api" wrapper) so the dev proxy matches production, where leaf
+      // serves the UI and these API routes from the same origin already.
       proxy: {
         "/auth": {
+          target: "http://localhost:8080",
+          changeOrigin: true,
+        },
+        "/.well-known": {
           target: "http://localhost:8080",
           changeOrigin: true,
         },
