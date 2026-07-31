@@ -27,3 +27,34 @@ export function isValidHandle(handle: string): boolean {
   const server = handle.slice(at + 1);
   return isValidUsername(username) && isValidServer(server);
 }
+
+export type LoginInput =
+  | { kind: "local"; username: string; server: string }
+  | { kind: "remote"; username: string; server: string }
+  | { kind: "invalid" };
+
+/**
+ * Accepts either a bare `username` (assumed to live on `currentServer`) or
+ * a full `username@server` handle, so the login field doesn't force typing
+ * `@server` for the common case of logging into the server you're on.
+ * Server comparison is case-insensitive, mirroring `RootId::parse`'s
+ * lowercasing (`brigid-identity/src/root_id.rs`) so `Example.com` and
+ * `example.com` are treated as the same server.
+ */
+export function parseLoginInput(
+  input: string,
+  currentServer: string,
+): LoginInput {
+  const at = input.indexOf("@");
+  if (at === -1) {
+    if (!isValidUsername(input)) return { kind: "invalid" };
+    return { kind: "local", username: input, server: currentServer };
+  }
+  if (!isValidHandle(input)) return { kind: "invalid" };
+  const username = input.slice(0, at);
+  const server = input.slice(at + 1);
+  if (server.toLowerCase() === currentServer.toLowerCase()) {
+    return { kind: "local", username, server };
+  }
+  return { kind: "remote", username, server };
+}
