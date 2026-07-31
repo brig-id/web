@@ -45,6 +45,17 @@ wa-page::part(main-content) {
   font-size: var(--wa-font-size-s);
 }
 
+.auth-server-hint {
+  margin: 0;
+  font-size: var(--wa-font-size-s);
+  color: var(--wa-color-text-quiet);
+}
+
+.auth-unsupported {
+  width: 100%;
+  max-width: 22rem;
+}
+
 .passkey-item {
   padding: var(--wa-space-s) var(--wa-space-m);
   border: solid var(--wa-border-width-s) var(--wa-color-surface-border);

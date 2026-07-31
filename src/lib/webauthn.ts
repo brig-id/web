@@ -10,6 +10,11 @@ import type {
   RegisterPublicKeyCredentialJSON,
 } from "./api-types";
 
+/** Feature-detects WebAuthn/passkey support in the current browser. */
+export function isPasskeySupported(): boolean {
+  return typeof window !== "undefined" && "PublicKeyCredential" in window;
+}
+
 export type WebAuthnErrorKind = "network" | "browser" | "api";
 
 export class WebAuthnError extends Error {
