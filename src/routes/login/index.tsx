@@ -1,9 +1,6 @@
-import { $, component$, useSignal } from "@builder.io/qwik";
+import { $, component$, useSignal, useVisibleTask$ } from "@builder.io/qwik";
 import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
-import { Button } from "~/components/button/button";
-import { Input } from "~/components/input/input";
-import { Alert } from "~/components/alert/alert";
-import { Card } from "~/components/card/card";
+import { wa, useWaTextInput, type WaInputElement } from "~/lib/wa";
 import { isValidHandle } from "~/lib/validation";
 import { login, storeAuth, WebAuthnError } from "~/lib/webauthn";
 
@@ -13,8 +10,19 @@ export default component$(() => {
   const touched = useSignal(false);
   const loading = useSignal(false);
   const error = useSignal<string | null>(null);
-
   const formatError = useSignal<string | null>(null);
+  const usernameRef = useSignal<WaInputElement>();
+
+  useVisibleTask$(() => {
+    void Promise.all([
+      wa.card(),
+      wa.input(),
+      wa.button(),
+      wa.callout(),
+      wa.icon(),
+    ]);
+  });
+  useWaTextInput(usernameRef, username, touched);
 
   const handleSubmit = $(async () => {
     if (!isValidHandle(username.value)) {
@@ -46,40 +54,37 @@ export default component$(() => {
     }
   });
 
+  const usernameError = touched.value
+    ? (formatError.value ?? undefined)
+    : undefined;
+
   return (
-    <main class="flex min-h-screen items-center justify-center p-4">
-      <Card>
-        <form
-          class="flex w-80 flex-col gap-4"
-          preventdefault:submit
-          onSubmit$={handleSubmit}
-        >
-          <h1 class="text-xl font-semibold">Sign in</h1>
-          <Input
-            label="Username"
-            name="username"
-            placeholder="user@server"
-            value={username.value}
-            error={touched.value ? (formatError.value ?? undefined) : undefined}
-            onInput$={(_: Event, el: HTMLInputElement) => {
-              username.value = el.value;
-            }}
-            onBlur$={() => {
-              touched.value = true;
-            }}
-          />
-          {error.value && <Alert variant="error">{error.value}</Alert>}
-          <Button
-            type="submit"
-            label="Sign in with passkey"
-            loading={loading.value}
-          />
-          <a href="/register/" class="text-center text-sm text-primary">
-            Create an account
-          </a>
-        </form>
-      </Card>
-    </main>
+    <wa-card class="auth-card">
+      <form class="wa-stack" preventdefault:submit onSubmit$={handleSubmit}>
+        <h1 class="wa-heading-l">Sign in</h1>
+        <wa-input
+          ref={usernameRef}
+          label="Username"
+          name="username"
+          placeholder="user@server"
+          value={username.value}
+          hint={usernameError}
+          class={usernameError ? "wa-input-error" : undefined}
+        />
+        {error.value && (
+          <wa-callout variant="danger" role="alert">
+            <wa-icon slot="icon" name="circle-exclamation"></wa-icon>
+            {error.value}
+          </wa-callout>
+        )}
+        <wa-button type="submit" variant="brand" loading={loading.value}>
+          Sign in with passkey
+        </wa-button>
+        <a href="/register/" class="auth-alt-link">
+          Create an account
+        </a>
+      </form>
+    </wa-card>
   );
 });
 

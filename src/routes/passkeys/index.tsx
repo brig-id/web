@@ -1,10 +1,7 @@
 import { $, component$, useSignal, useVisibleTask$ } from "@builder.io/qwik";
 import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
-import { Button } from "~/components/button/button";
-import { Input } from "~/components/input/input";
-import { Alert } from "~/components/alert/alert";
-import { Card } from "~/components/card/card";
 import { PasskeyItem } from "~/components/passkey-item/passkey-item";
+import { wa, useWaClick, useWaTextInput, type WaInputElement } from "~/lib/wa";
 import type { PasskeySummary } from "~/lib/api-types";
 import {
   clearAuth,
@@ -23,6 +20,19 @@ export default component$(() => {
   );
   const addUsername = useSignal("");
   const adding = useSignal(false);
+  const signOutRef = useSignal<HTMLElement>();
+  const addUsernameRef = useSignal<WaInputElement>();
+  const addButtonRef = useSignal<HTMLElement>();
+
+  useVisibleTask$(() => {
+    void Promise.all([
+      wa.card(),
+      wa.input(),
+      wa.button(),
+      wa.callout(),
+      wa.icon(),
+    ]);
+  });
 
   const refresh = $(async () => {
     const token = loadToken();
@@ -42,7 +52,6 @@ export default component$(() => {
     passkeys.value = (await response.json()) as PasskeySummary[];
   });
 
-  // eslint-disable-next-line qwik/no-use-visible-task -- localStorage is only available client-side
   useVisibleTask$(async () => {
     await refresh();
   });
@@ -91,52 +100,61 @@ export default component$(() => {
     await nav("/login/");
   });
 
+  useWaClick(signOutRef, handleSignOut);
+  useWaTextInput(addUsernameRef, addUsername);
+  useWaClick(addButtonRef, handleAdd);
+
   return (
-    <main class="flex min-h-screen items-center justify-center p-4">
-      <Card>
-        <div class="flex w-96 flex-col gap-4">
-          <div class="flex items-center justify-between">
-            <h1 class="text-xl font-semibold">Your passkeys</h1>
-            <Button
-              label="Sign out"
-              variant="secondary"
-              onClick$={handleSignOut}
-            />
-          </div>
-
-          {message.value && (
-            <Alert
-              variant={message.value.kind === "success" ? "success" : "error"}
-            >
-              {message.value.text}
-            </Alert>
-          )}
-
-          <div class="flex flex-col gap-2">
-            {passkeys.value.map((passkey) => (
-              <PasskeyItem
-                key={passkey.id}
-                id={passkey.id}
-                onDelete$={handleDelete}
-              />
-            ))}
-          </div>
-
-          <div class="flex gap-2">
-            <Input
-              label="Add a passkey"
-              name="add-username"
-              placeholder="user@server"
-              value={addUsername.value}
-              onInput$={(_: Event, el: HTMLInputElement) => {
-                addUsername.value = el.value;
-              }}
-            />
-            <Button label="Add" loading={adding.value} onClick$={handleAdd} />
-          </div>
+    <wa-card class="auth-card auth-card--wide">
+      <div class="wa-stack">
+        <div class="wa-split">
+          <h1 class="wa-heading-l">Your passkeys</h1>
+          <wa-button ref={signOutRef} appearance="outlined">
+            Sign out
+          </wa-button>
         </div>
-      </Card>
-    </main>
+
+        {message.value && (
+          <wa-callout
+            variant={message.value.kind === "success" ? "success" : "danger"}
+            role="alert"
+          >
+            <wa-icon
+              slot="icon"
+              name={
+                message.value.kind === "success"
+                  ? "circle-check"
+                  : "circle-exclamation"
+              }
+            ></wa-icon>
+            {message.value.text}
+          </wa-callout>
+        )}
+
+        <div class="wa-stack wa-gap-xs">
+          {passkeys.value.map((passkey) => (
+            <PasskeyItem
+              key={passkey.id}
+              id={passkey.id}
+              onDelete$={handleDelete}
+            />
+          ))}
+        </div>
+
+        <div class="wa-flank:end wa-gap-xs">
+          <wa-input
+            ref={addUsernameRef}
+            label="Add a passkey"
+            name="add-username"
+            placeholder="user@server"
+            value={addUsername.value}
+          />
+          <wa-button ref={addButtonRef} variant="brand" loading={adding.value}>
+            Add
+          </wa-button>
+        </div>
+      </div>
+    </wa-card>
   );
 });
 
