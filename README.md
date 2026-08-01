@@ -79,7 +79,7 @@ needed.
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm build     # production build (client modules + type check + lint)
+pnpm build     # production build (type check + client modules + SSG + lint)
 pnpm audit --audit-level=moderate
 ```
 
