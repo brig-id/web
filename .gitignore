@@ -9,6 +9,7 @@ node_modules
 .pnpm-store
 .env
 *.local
+.cert
 
 # Cache
 .cache

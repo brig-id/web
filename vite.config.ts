@@ -2,6 +2,7 @@
  * This is the base config for vite.
  * When building, the adapter config is used which loads this file and extends it.
  */
+import { existsSync, readFileSync } from "node:fs";
 import { defineConfig } from "vitest/config";
 import { qwikVite } from "@builder.io/qwik/optimizer";
 import { qwikCity } from "@builder.io/qwik-city/vite";
@@ -50,14 +51,23 @@ export default defineConfig(({ command, mode }) => {
       host: "0.0.0.0",
       // *.localhost auto-resolves to 127.0.0.1 in every modern browser (no
       // /etc/hosts entry needed) and is a secure context per the Secure
-      // Contexts spec, same as bare "localhost" — WebAuthn works on it over
-      // plain HTTP. Vite's Host-header check (DNS-rebinding protection)
-      // blocks anything not explicitly allowed, hence the entry below.
-      // Dropping the port too (bare "brigid.localhost", no ":5173") was
-      // evaluated and deferred: it needs Vite listening on :80 inside the
-      // container, which the non-root devcontainer user can't bind without
-      // added capabilities — more risk than the cosmetic win is worth today.
+      // Contexts spec, same as bare "localhost" — browsers run WebAuthn on
+      // it over plain HTTP. Vite's Host-header check (DNS-rebinding
+      // protection) blocks anything not explicitly allowed, hence the entry
+      // below. Dropping the port too (bare "brigid.localhost", no ":5173")
+      // was evaluated and deferred: it needs Vite listening on :80 inside
+      // the container, which the non-root devcontainer user can't bind
+      // without added capabilities — more risk than the cosmetic win is
+      // worth today.
       allowedHosts: [".localhost"],
+      // Real HTTPS on top of the *.localhost exception above: some WebAuthn
+      // clients (password-manager passkey providers, e.g. Proton Pass) run
+      // their own origin check that's stricter than the Secure Contexts spec
+      // and don't grant the plain-HTTP *.localhost exception browsers do —
+      // they require an actual https:// scheme. Generate the cert once with
+      // `mkcert` (see README) — falls back to plain HTTP if it hasn't been
+      // generated yet, so a fresh clone still runs `pnpm dev` out of the box.
+      https: httpsConfig(),
       headers: {
         // Don't cache the server response in dev mode
         "Cache-Control": "public, max-age=0",
@@ -90,6 +100,22 @@ export default defineConfig(({ command, mode }) => {
 });
 
 // *** utils ***
+
+const CERT_DIR = new URL(".cert/", import.meta.url);
+const CERT_FILE = new URL("brigid.localhost.pem", CERT_DIR);
+const KEY_FILE = new URL("brigid.localhost-key.pem", CERT_DIR);
+
+/**
+ * Reads the mkcert-generated cert for `brigid.localhost` if present.
+ * Returns undefined (plain HTTP) when it hasn't been generated yet.
+ */
+function httpsConfig() {
+  if (!existsSync(CERT_FILE) || !existsSync(KEY_FILE)) return undefined;
+  return {
+    cert: readFileSync(CERT_FILE),
+    key: readFileSync(KEY_FILE),
+  };
+}
 
 /**
  * Function to identify duplicate dependencies and throw an error
