@@ -5,3 +5,11 @@ allowBuilds:
   "@tailwindcss/oxide": true
 minimumReleaseAgeExclude:
   - "@web.awesome.me/webawesome-pro@3.11.0"
+  - esbuild@0.28.1
+  - sharp@0.35.0
+  - brace-expansion@1.1.17
+overrides:
+  # vite-imagetools pins an older sharp with known libvips CVEs
+  # (GHSA-f88m-g3jw-g9cj); force the patched line. Dev-only build tool
+  # (image asset processing), never shipped to the browser.
+  sharp: ">=0.35.0"
