@@ -1,4 +1,4 @@
-# brig·id — web
+# brig·id — app
 
 Qwik UI for brig·id: login, register, and passkey management (WebAuthn).
 Consumes `brigid-api` (served by `server-leaf`) over the same origin.

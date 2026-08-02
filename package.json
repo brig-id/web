@@ -1,5 +1,5 @@
 {
-  "name": "@brig-id/web",
+  "name": "@brig-id/app",
   "description": "brig·id — Qwik UI: login, register, and passkey management (WebAuthn)",
   "engines": {
     "node": "^18.17.0 || ^20.3.0 || >=21.0.0"
