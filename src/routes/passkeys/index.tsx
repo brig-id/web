@@ -45,10 +45,21 @@ export default component$(() => {
       await nav("/login/");
       return;
     }
-    const response = await fetch(
-      `/auth/passkeys?user_id=${encodeURIComponent(userId)}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
+    const fetchPasskeys = () =>
+      fetch(`/auth/passkeys?user_id=${encodeURIComponent(userId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    let response = await fetchPasskeys();
+    if (response.status === 429) {
+      // This call typically lands right after register+login (or a delete),
+      // which can already have spent most of the /auth/* rate-limit burst —
+      // without a retry here, a 429 leaves the list silently stale even
+      // though the action that triggered this refresh actually succeeded.
+      // The limiter refills one token every 3s (brigid-api's
+      // GovernorConfigBuilder), so a single backoff is enough.
+      await new Promise((resolve) => setTimeout(resolve, 3500));
+      response = await fetchPasskeys();
+    }
     if (!response.ok) {
       message.value = { kind: "error", text: "Unable to load passkeys." };
       return;

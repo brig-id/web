@@ -23,7 +23,6 @@ export default function (opts: RenderToStreamOptions) {
     containerAttributes: {
       lang: "en-us",
       class: "wa-theme-tailspin wa-palette-shoelace wa-brand-indigo wa-dark",
-      "data-fa-kit-code": "b853f7642b",
       ...opts.containerAttributes,
     },
     serverData: {
