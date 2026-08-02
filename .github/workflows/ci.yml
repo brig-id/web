@@ -1,0 +1,15 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    uses: brig-id/.github/.github/workflows/ci-web.yml@c88e9a8de4a15620f5b56bf837da160cc25c9710
+    with:
+      working-directory: .
+    secrets:
+      WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}

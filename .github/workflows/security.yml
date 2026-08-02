@@ -1,0 +1,17 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  security:
+    uses: brig-id/.github/.github/workflows/security-audit-web.yml@c88e9a8de4a15620f5b56bf837da160cc25c9710
+    with:
+      working-directory: .
+    secrets:
+      WEBAWESOME_NPM_TOKEN: ${{ secrets.WEBAWESOME_NPM_TOKEN }}

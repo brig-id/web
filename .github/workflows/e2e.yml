@@ -1,0 +1,81 @@
+name: E2E
+
+# Custom (not a brig-id/.github reusable workflow): this suite drives a real
+# `leaf` binary from the sibling brig-id/server-leaf repo, which itself pulls
+# brig-id/core and brig-id/crypto as git dependencies at build time — that
+# multi-repo shape is specific to this suite, not something a generic JS/web
+# reusable template should carry.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  e2e:
+    name: Playwright (register/login/passkeys against a real leaf)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout web
+        uses: actions/checkout@v7
+        with:
+          path: web
+
+      - name: Checkout server-leaf
+        uses: actions/checkout@v7
+        with:
+          repository: brig-id/server-leaf
+          ref: main
+          path: server-leaf
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y mold
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('server-leaf/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Configure Web Awesome Pro registry auth
+        if: ${{ secrets.WEBAWESOME_NPM_TOKEN != '' }}
+        run: echo "//npm.cloudsmith.io/fortawesome/webawesome-pro/:_authToken=${{ secrets.WEBAWESOME_NPM_TOKEN }}" >> ~/.npmrc
+
+      - uses: helpers4/action/setup-pnpm@6fddd178620e7325d446a246c38a44f979569fc4 # main @ 2026-07-29
+        with:
+          node-version: "24"
+          working-directory: web
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install --with-deps chromium firefox
+
+      - name: Run Playwright E2E suite
+        working-directory: web
+        env:
+          SERVER_LEAF_DIR: ${{ github.workspace }}/server-leaf
+          CI: "true"
+        run: pnpm run test.e2e
+
+      - name: Upload Playwright traces on failure
+        # playwright.config.ts uses the "github" reporter in CI (inline PR
+        # annotations, no HTML report file) — test-results/ still holds a
+        # trace.zip per failed test (trace: "on-first-retry"), viewable via
+        # `npx playwright show-trace`.
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-traces
+          path: web/test-results/
+          retention-days: 14
