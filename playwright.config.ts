@@ -16,25 +16,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const SERVER_LEAF_DIR =
   process.env.SERVER_LEAF_DIR ?? path.resolve(__dirname, "../server-leaf");
 
-// KNOWN ISSUE (see phases/backlog.md "Static SSG build breaks Qwik
-// hydration"): the `pnpm build` static-adapter output currently ships at
-// least one empty bootstrap chunk, so qwikloader never initializes and no
-// custom element (wa-input, wa-button, ...) ever becomes interactive when
-// served statically — reproduced with `leaf` entirely out of the picture
-// (plain Python http.server). Until that's root-caused, this suite runs
-// against `pnpm dev` instead (vite dev server + SSR), which is known-good —
-// verified manually multiple times this session. Swap back to the static
-// build + a single `leaf` webServer once the bug above is fixed; that's the
-// actually-representative-of-production setup.
+// This suite now runs against the real production topology: a single
+// `leaf` process serving both the API and the Qwik static (SSG) build via
+// `LEAF_SERVER__UI_DIST_DIR`, exactly as `server-leaf` does in production —
+// no separate `pnpm dev`/vite process, no proxy, no CORS.
+//
+// (Previously this ran against `pnpm dev` instead: the static-adapter
+// output shipped an empty bootstrap chunk under `rolldown-vite`, so
+// qwikloader never initialized and no custom element ever became
+// interactive when served statically — reproduced with `leaf` entirely out
+// of the picture, plain Python http.server. Root-caused to `rolldown-vite`
+// itself: switching `web`'s `vite` dependency back to plain `vite` produces
+// a real, non-empty bootstrap chunk with working hydration — verified with
+// a headless Chromium check (custom elements upgrade, shadow roots attach,
+// zero console errors). See `CHANGELOG.md`.)
 const CERT_DIR = path.join(__dirname, ".cert");
 const HAS_CERT =
   existsSync(path.join(CERT_DIR, "brigid.localhost.pem")) &&
   existsSync(path.join(CERT_DIR, "brigid.localhost-key.pem"));
 const WEB_PROTOCOL = HAS_CERT ? "https" : "http";
-const WEB_PORT = 5173;
-const LEAF_PORT = 8080; // hardcoded in vite.config.ts's dev proxy target
+const LEAF_PORT = 8080;
 
-export const E2E_ORIGIN = `${WEB_PROTOCOL}://brigid.localhost:${WEB_PORT}`;
+export const E2E_ORIGIN = `${WEB_PROTOCOL}://brigid.localhost:${LEAF_PORT}`;
 
 // Fixed, valid-looking 64-hex-char (32 byte) master key — deterministic,
 // dev/test only. Mirrors server-leaf/tests/binary.rs's TEST_MASTER_KEY.
@@ -85,14 +88,16 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `cargo run --manifest-path ${path.join(SERVER_LEAF_DIR, "Cargo.toml")}`,
-      // Readiness polling happens in Node (not a browser) — Node's
-      // `dns.lookup` has no built-in RFC 6761 `.localhost` handling on this
-      // system (unlike curl and every real browser, which special-case it
-      // internally), so `brigid.localhost` here would fail with ENOTFOUND.
-      // 127.0.0.1 sidesteps that; the actual tests navigate via `baseURL`,
-      // which Chromium/Firefox resolve to loopback just fine.
-      url: `http://127.0.0.1:${LEAF_PORT}/health`,
+      // Build the real static (SSG) artifact first, then start the single
+      // `leaf` process that serves both the API and that build via
+      // `LEAF_SERVER__UI_DIST_DIR` — the actual production topology, one
+      // origin, no proxy, no CORS.
+      command: `pnpm build.server && cargo run --manifest-path ${path.join(SERVER_LEAF_DIR, "Cargo.toml")}`,
+      // A `port` (TCP-only) check, not `url`: when `.cert/` is populated
+      // `leaf` serves HTTPS only, and Playwright's webServer readiness
+      // check can't be told to accept a self-signed cert the way
+      // `use.ignoreHTTPSErrors` does for the browser itself.
+      port: LEAF_PORT,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {
@@ -101,6 +106,7 @@ export default defineConfig({
         LEAF_SERVER__HOST: "127.0.0.1",
         LEAF_SERVER__PORT: String(LEAF_PORT),
         LEAF_SERVER__PUBLIC_URL: E2E_ORIGIN,
+        LEAF_SERVER__UI_DIST_DIR: path.join(__dirname, "dist"),
         // A per-config-load path, not a fixed one in the repo: a fixed path
         // would persist stale accounts/passkeys across runs on anything that
         // doesn't do a clean checkout per run (self-hosted CI runners,
@@ -110,18 +116,19 @@ export default defineConfig({
           os.tmpdir(),
           `brigid-e2e-${Date.now()}.db`,
         ),
+        ...(HAS_CERT
+          ? {
+              LEAF_SERVER__TLS_CERT: path.join(
+                CERT_DIR,
+                "brigid.localhost.pem",
+              ),
+              LEAF_SERVER__TLS_KEY: path.join(
+                CERT_DIR,
+                "brigid.localhost-key.pem",
+              ),
+            }
+          : {}),
       },
-    },
-    {
-      command: "pnpm dev",
-      // A `port` (TCP-only) check, not `url`: vite dev serves HTTPS whenever
-      // `web/.cert/` is populated (see vite.config.ts's `httpsConfig()`),
-      // and Playwright's webServer readiness check can't be told to accept
-      // a self-signed cert the way `use.ignoreHTTPSErrors` does for the
-      // browser itself.
-      port: WEB_PORT,
-      reuseExistingServer: !process.env.CI,
-      timeout: 60_000,
     },
   ],
 });
