@@ -88,7 +88,13 @@ async function clickUntil(
   attempts = 5,
 ) {
   for (let i = 0; i < attempts; i++) {
-    await button.click();
+    // A short timeout, not the default 30s: if a prior iteration's click
+    // already went through and `button` vanished as a result (list emptied,
+    // redirected away from the page it was on), there's nothing left to
+    // click — falling through to `check()` below is what actually detects
+    // that, rather than hanging here waiting for an element that will never
+    // reappear.
+    await button.click({ timeout: 2000 }).catch(() => {});
     try {
       await check();
       return;
