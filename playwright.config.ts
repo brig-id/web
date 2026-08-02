@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -100,7 +101,15 @@ export default defineConfig({
         LEAF_SERVER__HOST: "127.0.0.1",
         LEAF_SERVER__PORT: String(LEAF_PORT),
         LEAF_SERVER__PUBLIC_URL: E2E_ORIGIN,
-        LEAF_DATABASE__PATH: path.join(__dirname, ".e2e-leaf.db"),
+        // A per-config-load path, not a fixed one in the repo: a fixed path
+        // would persist stale accounts/passkeys across runs on anything that
+        // doesn't do a clean checkout per run (self-hosted CI runners,
+        // `reuseExistingServer: false` re-runs), silently changing test
+        // behavior instead of starting from an empty database each time.
+        LEAF_DATABASE__PATH: path.join(
+          os.tmpdir(),
+          `brigid-e2e-${Date.now()}.db`,
+        ),
       },
     },
     {
