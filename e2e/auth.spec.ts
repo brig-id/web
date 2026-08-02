@@ -286,3 +286,52 @@ test.describe("form validation (no passkey required)", () => {
     ).toBeVisible();
   });
 });
+
+// isPasskeySupported() just checks "PublicKeyCredential" in window (see
+// lib/webauthn.ts), so deleting it before any page script runs simulates an
+// unsupported browser/device regardless of what Chromium/Firefox actually
+// support — no navigator.credentials involved, so (like the validation
+// block above) these run on both projects and never touch the rate-limited
+// /auth/* endpoints.
+test.describe("unsupported browser (no WebAuthn)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      // @ts-expect-error - deliberately removing a browser API for the test
+      delete window.PublicKeyCredential;
+    });
+  });
+
+  test("register shows the unsupported-browser callout instead of the form", async ({
+    page,
+  }) => {
+    await page.goto("/register/");
+
+    await expect(page.locator(".auth-unsupported")).toBeVisible();
+    await expect(
+      page.getByText(/Passkeys aren't supported on this browser or device/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: "Username" }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Create account" }),
+    ).not.toBeVisible();
+  });
+
+  test("login shows the unsupported-browser callout instead of the form", async ({
+    page,
+  }) => {
+    await page.goto("/login/");
+
+    await expect(page.locator(".auth-unsupported")).toBeVisible();
+    await expect(
+      page.getByText(/Passkeys aren't supported on this browser or device/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("textbox", { name: "Username" }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Sign in with passkey" }),
+    ).not.toBeVisible();
+  });
+});
